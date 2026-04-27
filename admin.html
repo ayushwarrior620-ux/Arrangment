@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin - GGPS Dhanbad</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Data Entry Dashboard</h1>
+    <div class="grid">
+        <div class="card">
+            <h2>Add Teacher</h2>
+            <input type="text" id="tName" placeholder="Name">
+            <select id="tWing">
+                <option value="Primary">Primary (Nurs-V)</option>
+                <option value="Senior">Senior (VI-XII)</option>
+            </select>
+            <input type="text" id="tSubject" placeholder="Subject (e.g. Math)">
+            <button onclick="addTeacher()">Save Teacher</button>
+        </div>
+
+        <div class="card">
+            <h2>Add Class</h2>
+            <input type="text" id="cName" placeholder="Grade-Section (e.g. 10-A)">
+            <select id="cWing">
+                <option value="Primary">Primary</option>
+                <option value="Senior">Senior</option>
+            </select>
+            <button onclick="addClass()">Save Class</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Set Master Timetable</h2>
+        <select id="selT"><option>Loading Teachers...</option></select>
+        <select id="selC"><option>Loading Classes...</option></select>
+        <select id="selDay">
+            <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+            <option>Thursday</option><option>Friday</option><option>Saturday</option>
+        </select>
+        <input type="number" id="selP" min="1" max="8" placeholder="Period (1-8)">
+        <button onclick="addSlot()">Assign Slot</button>
+    </div>
+
+    <script>
+        const SB_URL = "https://cfxobkfkhlirxepxvxjr.supabase.co";
+        const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNmeG9ia2ZraGxpcnhlcHh2eGpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMTI2NDUsImV4cCI6MjA5Mjg4ODY0NX0.spKXqpRScu3U7uiMnoA0iEJkiLf68RxGZya07WRlakg";
+        const supabase = supabase.createClient(SB_URL, SB_KEY);
+
+        async function loadData() {
+            const { data: t } = await supabase.from('teachers').select('*');
+            const { data: c } = await supabase.from('classes').select('*');
+            document.getElementById('selT').innerHTML = t.map(x => `<option value="${x.id}">${x.name}</option>`).join('');
+            document.getElementById('selC').innerHTML = c.map(x => `<option value="${x.id}">${x.grade_section}</option>`).join('');
+        }
+
+        async function addTeacher() {
+            const name = document.getElementById('tName').value;
+            const wing = document.getElementById('tWing').value;
+            const subject = document.getElementById('tSubject').value;
+            await supabase.from('teachers').insert([{ name, wing, subject }]);
+            alert("Done!"); loadData();
+        }
+
+        async function addClass() {
+            const grade_section = document.getElementById('cName').value;
+            const wing = document.getElementById('cWing').value;
+            await supabase.from('classes').insert([{ grade_section, wing }]);
+            alert("Done!"); loadData();
+        }
+
+        async function addSlot() {
+            await supabase.from('timetable').insert([{
+                teacher_id: document.getElementById('selT').value,
+                class_id: document.getElementById('selC').value,
+                day_of_week: document.getElementById('selDay').value,
+                period_number: document.getElementById('selP').value
+            }]);
+            alert("Slot Assigned!");
+        }
+
+        loadData();
+    </script>
+</body>
+</html>

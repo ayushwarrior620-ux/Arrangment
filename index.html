@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GGPS Arrangement Portal</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Daily Proxy System</h1>
+    <div class="card">
+        <h2>1. Mark Absentees</h2>
+        <div id="attendanceList"></div>
+    </div>
+
+    <div class="card">
+        <h2>2. Today's Proxy Suggestions</h2>
+        <button onclick="generateProxies()" style="background:#38a169">Find Substitutes</button>
+        <div id="proxyResults"></div>
+    </div>
+
+    <script>
+        const SB_URL = "YOUR_SUPABASE_URL";
+        const SB_KEY = "YOUR_SUPABASE_ANON_KEY";
+        const supabase = supabase.createClient(SB_URL, SB_KEY);
+
+        async function loadTeachers() {
+            const { data } = await supabase.from('teachers').select('*');
+            let html = data.map(t => `
+                <div>
+                    <input type="checkbox" ${t.is_absent ? 'checked' : ''} 
+                        onchange="toggleAbsent(${t.id}, this.checked)"> ${t.name} (${t.wing})
+                </div>
+            `).join('');
+            document.getElementById('attendanceList').innerHTML = html;
+        }
+
+        async function toggleAbsent(id, val) {
+            await supabase.from('teachers').update({ is_absent: val }).eq('id', id);
+        }
+
+        async function generateProxies() {
+            const day = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(new Date());
+            const { data: absentees } = await supabase.from('teachers').select('*').eq('is_absent', true);
+            const { data: present } = await supabase.from('teachers').select('*').eq('is_absent', false);
+            const { data: fullTT } = await supabase.from('timetable').select('*, classes(*)').eq('day_of_week', day);
+
+            let results = "";
+
+            for (let abs of absentees) {
+                const absPeriods = fullTT.filter(slot => slot.teacher_id === abs.id);
+                for (let p of absPeriods) {
+                    // Logic: Find teachers who have NO class in this period
+                    const busyTeacherIds = fullTT.filter(slot => slot.period_number === p.period_number).map(s => s.teacher_id);
+                    
+                    let freeTeachers = present.filter(t => {
+                        // Rule: If it's period 7 or 8, Primary teachers are naturally free
+                        if (p.period_number > 6 && t.wing === 'Primary') return true;
+                        return !busyTeacherIds.includes(t.id);
+                    });
+
+                    // Sort by Priority: Same Wing first
+                    freeTeachers.sort((a, b) => (a.wing === abs.wing ? -1 : 1));
+
+                    results += `
+                        <div class="absent-row">
+                            <strong>Period ${p.period_number}: ${p.classes.grade_section}</strong> (Absent: ${abs.name})<br>
+                            <span class="proxy-suggest">Try: ${freeTeachers[0]?.name || "No one free"}</span>
+                        </div>`;
+                }
+            }
+            document.getElementById('proxyResults').innerHTML = results || "All classes covered!";
+        }
+
+        loadTeachers();
+    </script>
+</body>
+</html>
